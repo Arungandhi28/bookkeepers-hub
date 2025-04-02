@@ -16,7 +16,7 @@ const mockUsers = [
   {
     id: '1',
     email: 'admin@library.com',
-    password: 'admin123',
+    password: '1234',  // Updated password to match user's request
     name: 'Admin User',
     role: 'admin' as UserRole,
     created_at: '2023-01-01T00:00:00Z'
