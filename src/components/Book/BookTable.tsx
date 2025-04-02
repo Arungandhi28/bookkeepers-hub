@@ -26,85 +26,74 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Edit, MoreVertical, Trash2, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-
-// Mock data - would come from Supabase in production
-const mockBooks: Book[] = [
-  {
-    id: '1',
-    title: 'Introduction to Human Biology',
-    author: 'Jane Smith',
-    category: 'Human Science',
-    total_copies: 5,
-    available_copies: 3,
-    isbn: '978-3-16-148410-0',
-    published_year: 2020,
-    publisher: 'Science Press',
-    created_at: '2023-01-15T10:00:00Z',
-    updated_at: '2023-01-15T10:00:00Z',
-  },
-  {
-    id: '2',
-    title: 'Advanced Calculus',
-    author: 'John Doe',
-    category: 'Maths',
-    total_copies: 8,
-    available_copies: 5,
-    isbn: '978-1-4028-9462-6',
-    published_year: 2018,
-    publisher: 'Math Publications',
-    created_at: '2023-02-10T14:30:00Z',
-    updated_at: '2023-02-10T14:30:00Z',
-  },
-  {
-    id: '3',
-    title: 'Organic Chemistry Fundamentals',
-    author: 'Robert Johnson',
-    category: 'Chemistry',
-    total_copies: 10,
-    available_copies: 0,
-    isbn: '978-0-7645-7018-7',
-    published_year: 2019,
-    publisher: 'Chemistry House',
-    created_at: '2023-01-05T09:15:00Z',
-    updated_at: '2023-03-12T11:20:00Z',
-  },
-  {
-    id: '4',
-    title: 'Quantum Physics Explained',
-    author: 'Maria Garcia',
-    category: 'Physics',
-    total_copies: 4,
-    available_copies: 2,
-    isbn: '978-3-642-11934-7',
-    published_year: 2021,
-    publisher: 'Physics World',
-    created_at: '2023-02-28T13:45:00Z',
-    updated_at: '2023-02-28T13:45:00Z',
-  },
-  {
-    id: '5',
-    title: 'Pride and Prejudice',
-    author: 'Jane Austen',
-    category: 'Novels',
-    total_copies: 15,
-    available_copies: 10,
-    isbn: '978-0-141-43951-8',
-    published_year: 1813,
-    publisher: 'Classic Reads',
-    created_at: '2023-01-20T08:30:00Z',
-    updated_at: '2023-01-20T08:30:00Z',
-  },
-];
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/lib/toast';
 
 interface BookTableProps {
   onEdit: (book: Book) => void;
 }
 
 export function BookTable({ onEdit }: BookTableProps) {
-  const [books, setBooks] = useState<Book[]>(mockBooks);
+  const [books, setBooks] = useState<Book[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filteredBooks, setFilteredBooks] = useState<Book[]>(mockBooks);
+  const [filteredBooks, setFilteredBooks] = useState<Book[]>([]);
+  const [loading, setLoading] = useState(true);
 
+  // Fetch books from Supabase
+  useEffect(() => {
+    const fetchBooks = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('books')
+          .select('*');
+
+        if (error) {
+          throw error;
+        }
+
+        setBooks(data || []);
+      } catch (error) {
+        console.error('Error fetching books:', error);
+        toast.error('Failed to load books');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBooks();
+
+    // Set up real-time listener for books table
+    const channel = supabase
+      .channel('books-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'books' },
+        (payload) => {
+          console.log('Change received:', payload);
+          if (payload.eventType === 'INSERT') {
+            setBooks((current) => [...current, payload.new as Book]);
+          } else if (payload.eventType === 'UPDATE') {
+            setBooks((current) =>
+              current.map((book) =>
+                book.id === payload.new.id ? payload.new as Book : book
+              )
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setBooks((current) =>
+              current.filter((book) => book.id !== payload.old.id)
+            );
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // Filter books based on search term
   useEffect(() => {
     const results = books.filter(book => 
       book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -115,10 +104,23 @@ export function BookTable({ onEdit }: BookTableProps) {
     setFilteredBooks(results);
   }, [searchTerm, books]);
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this book?')) {
-      // In production this would be a Supabase delete operation
-      setBooks(prevBooks => prevBooks.filter(book => book.id !== id));
+      try {
+        const { error } = await supabase
+          .from('books')
+          .delete()
+          .eq('id', id);
+
+        if (error) {
+          throw error;
+        }
+
+        toast.success('Book deleted successfully');
+      } catch (error) {
+        console.error('Error deleting book:', error);
+        toast.error('Failed to delete book');
+      }
     }
   };
 
@@ -167,7 +169,13 @@ export function BookTable({ onEdit }: BookTableProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredBooks.length > 0 ? (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8">
+                    Loading books...
+                  </TableCell>
+                </TableRow>
+              ) : filteredBooks.length > 0 ? (
                 filteredBooks.map((book) => (
                   <TableRow key={book.id}>
                     <TableCell className="font-medium">{book.title}</TableCell>

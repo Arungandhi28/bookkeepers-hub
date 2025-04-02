@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { MainLayout } from '@/components/Layout/MainLayout';
 import { BookTable } from '@/components/Book/BookTable';
@@ -6,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Book } from '@/types';
 import { Plus } from 'lucide-react';
 import { toast } from '@/lib/toast';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Books() {
   const [bookFormOpen, setBookFormOpen] = useState(false);
@@ -21,14 +23,37 @@ export default function Books() {
     setBookFormOpen(true);
   };
 
-  const handleSaveBook = (book: Partial<Book>) => {
-    // In production this would save to Supabase
-    console.log('Saving book:', book);
-    
-    if (selectedBook) {
-      toast.success('Book updated successfully');
-    } else {
-      toast.success('Book added successfully');
+  const handleSaveBook = async (book: Partial<Book>) => {
+    try {
+      if (selectedBook) {
+        // Update existing book
+        const { error } = await supabase
+          .from('books')
+          .update(book)
+          .eq('id', selectedBook.id);
+
+        if (error) {
+          throw error;
+        }
+        
+        toast.success('Book updated successfully');
+      } else {
+        // Insert new book
+        const { error } = await supabase
+          .from('books')
+          .insert([book]);
+
+        if (error) {
+          throw error;
+        }
+        
+        toast.success('Book added successfully');
+      }
+      
+      setBookFormOpen(false);
+    } catch (error) {
+      console.error('Error saving book:', error);
+      toast.error('Failed to save book');
     }
   };
 
