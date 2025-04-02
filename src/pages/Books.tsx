@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { MainLayout } from '@/components/Layout/MainLayout';
 import { BookTable } from '@/components/Book/BookTable';
@@ -6,7 +5,7 @@ import { BookForm } from '@/components/Book/BookForm';
 import { Button } from '@/components/ui/button';
 import { Book } from '@/types';
 import { Plus } from 'lucide-react';
-import { toast } from '@/components/ui/sonner';
+import { toast } from '@/lib/toast';
 
 export default function Books() {
   const [bookFormOpen, setBookFormOpen] = useState(false);

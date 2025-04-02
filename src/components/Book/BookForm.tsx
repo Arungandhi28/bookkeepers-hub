@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Book, BookCategory } from '@/types';
 import { 
@@ -20,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { toast } from '@/components/ui/sonner';
+import { toast } from '@/lib/toast';
 
 const BOOK_CATEGORIES: BookCategory[] = [
   'Human Science',
